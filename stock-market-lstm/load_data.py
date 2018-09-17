@@ -44,7 +44,7 @@ def normalize_window(df):
 
 def gen_clean_data(df, x_window_size, y_window_size, batch_size=1000, normalize=True):
 	if 'OpenInt' in df.columns: df.drop(['OpenInt'], axis = 1, inplace = True)
-	num_days = x_window_size + y_window_size + 1000
+	num_days = x_window_size + y_window_size + 2
 	ema_smoothing_constant = 2.0 / (y_window_size + 1)
 	x_data = list()
 	y_data = list()
@@ -68,7 +68,7 @@ def gen_clean_data(df, x_window_size, y_window_size, batch_size=1000, normalize=
 		y_data.append(y_data_ave)
 
 		index += 1
-		if (index % batch_size == 0):
+		if (index % batch_size == 0) or (index+total_window_size == num_days):
 			x_data_3d = np.array(x_data)
 			y_data_3d = np.array(y_data)
 			x_data = []
