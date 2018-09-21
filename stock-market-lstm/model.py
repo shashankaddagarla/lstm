@@ -13,22 +13,23 @@ from keras.layers import LSTM
 from keras.layers import Dropout
 from keras.models import Sequential
 from keras.models import load_model
+from keras import optimizers
 
 activation_function = 'tanh'
 loss = 'mae'
-optimizer = 'adam'
+optimizer = optimizers.Adam(clipnorm = 1)
 dropout = .25
 
 def build_model(layers, activ_func=activation_function, dropout=dropout, optimizer=optimizer):
 	model = Sequential()
 
-	model.add(LSTM(input_dim = layers[0], output_dim = layers[1], return_sequences = True)) # first layer so required input_shape
+	model.add(LSTM(input_shape = (layers[0], layers[1]), return_sequences = True, units= layers[2])) # first layer so required input_shape
 	model.add(Dropout(dropout))
 
-	model.add(LSTM(layers[2], return_sequences = False, activation = activ_func))
+	model.add(LSTM(layers[3], return_sequences = False, activation = activ_func))
 	model.add(Dropout(dropout))
 
-	model.add(Dense(output_dim=layers[3]))
+	model.add(Dense(units=layers[4]))
 	model.add(Activation(activ_func))
 
 	start = time.time()

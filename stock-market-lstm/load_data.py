@@ -25,7 +25,7 @@ def create_dataframe_for(how='kaggle', ticker='AAL'):
 					df.loc[-1,:] = data_row
 					df.index += 1
 			print('>>> Data saved to %s'%file_name)
-			df.to_csv(file_name)
+			df.to_csv(file_name, index=False)
 		else:
 			print('>>> File already exists. Loading data from %s'%file_name)
 			df = pd.read_csv(file_name)
@@ -42,9 +42,9 @@ def create_dataframe_for(how='kaggle', ticker='AAL'):
 def normalize_window(df):
 	return (df / df.iloc[0]) - 1
 
-def gen_clean_data(df, x_window_size, y_window_size, batch_size=1000, normalize=True):
+def clean_data(df, x_window_size, y_window_size, normalize=True):
 	if 'OpenInt' in df.columns: df.drop(['OpenInt'], axis = 1, inplace = True)
-	num_days = x_window_size + y_window_size + 2
+	num_days = len(df)
 	ema_smoothing_constant = 2.0 / (y_window_size + 1)
 	x_data = list()
 	y_data = list()
@@ -66,22 +66,71 @@ def gen_clean_data(df, x_window_size, y_window_size, batch_size=1000, normalize=
 		else:
 			y_data_ave = y_window['Close'].mean()
 		y_data.append(y_data_ave)
-
+		print(index)
 		index += 1
-		if (index % batch_size == 0) or (index+total_window_size == num_days):
-			x_data_3d = np.array(x_data)
-			y_data_3d = np.array(y_data)
-			x_data = []
-			y_data = []
-			return (x_data_3d, y_data_3d)
 
-def split_data(df, training_test_split = 0.9):
-	return df[:int(training_test_split * len(df))], df[int(training_test_split * len(df)):]
+	x_data_3d = np.array(x_data)
+	y_data_3d = np.array(y_data)
+	return (x_data_3d, y_data_3d)
 
+def verify_data(data):
+	for x, y in (data):
+		print(np.where(x > 2))
 
-#df = create_dataframe_for(how='kaggle', ticker='HPQ')
-df = create_dataframe_for(how="alphavantage", ticker='AAL')
-df = df.sort_values('Date')
-print(gen_clean_data(df, 50, 20))
+def write_clean_data(data, test_train_split = 0.9, filename='clean-data.npz'):
+	num_train_examples = int((data[0].shape[0]) * test_train_split)
+	np.savez_compressed(
+		file=os.path.join(os.curdir, 'processed-data', filename),
+		x_train=data[0][:num_train_examples],
+		x_test=data[0][num_train_examples:],
+		y_train=data[1][:num_train_examples],
+		y_test=data[1][num_train_examples:]
+	)
+	print('>>> Processed data written to', filename)
 
-plot_data.plot_raw_data(df)
+def gen_clean_data(filename, set='train', batch_size = 1000):
+	index = 0
+	if os.path.isfile(os.path.join(os.curdir, 'processed-data', filename)):
+		data = np.load(os.path.join(os.curdir, 'processed-data', filename))
+		print('>>> Loaded data from', filename)
+	else:
+		print('>>> Processed data with specified filename not found.')
+		return None
+	x_train = data['x_train']
+	x_test = data['x_test']
+	y_train = data['y_train']
+	y_test = data['y_test']
+
+	num_examples = x_train.shape[0] if set == 'train' else x_test.shape[0]
+
+	while (True):
+		index += batch_size
+		if (set == 'train'):
+			if (index > num_examples):
+				index = 0
+				yield (x_train[num_examples - (num_examples % batch_size):num_examples], y_train[num_examples - (num_examples % batch_size):num_examples])
+			elif (index == num_examples):
+				index = 0
+				yield (x_train[num_examples - batch_size:num_examples], y_train[num_examples - batch_size:num_examples])
+			else:
+				yield (x_train[index - batch_size:index], y_train[index - batch_size:index])
+		elif (set == 'test'):
+			if (index >= num_examples):
+				index = 0
+				yield (x_test[num_examples - (num_examples % batch_size):num_examples], y_test[num_examples - (num_examples % batch_size):num_examples])
+			else:
+				yield (x_test[index - batch_size:index], y_test[index - batch_size:index])
+		else:
+			print('>>> Not a valid dataset.')
+			return None
+
+# df = create_dataframe_for(how='kaggle', ticker='HPQ')
+# df = create_dataframe_for(how="kaggle", ticker='AAPL')
+# df = df.sort_values('Date')
+
+# cleaned_data = clean_data(df, 50, 20)
+# write_clean_data(cleaned_data, filename='kaggle-aapl-clean.npz')
+'''
+data = np.load(os.path.join(os.curdir, 'processed-data', 'kaggle-aapl-clean.npz'))
+whatwewant = zip(data['x_train'], data['y_train'])
+verify_data(whatwewantsource)'''
